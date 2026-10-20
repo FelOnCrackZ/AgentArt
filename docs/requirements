@@ -1,0 +1,544 @@
+================================================================================
+AGENTART
+La agenda cultural de tu ciudad
+================================================================================
+
+AgentArt es un portal web donde organizadores locales publican conciertos,
+ferias y talleres, y el publico los descubre, los filtra y guarda sus
+favoritos. Cada evento pasa por una moderacion antes de publicarse.
+
+CONTENIDO
+  1. Integrantes del proyecto
+  2. Idea de desarrollo web elegida
+  3. Requerimientos funcionales
+  4. Requerimientos no funcionales y Definition of Done
+  5. Modelado de la base de datos
+
+
+--------------------------------------------------------------------------------
+1. INTEGRANTES DEL PROYECTO
+--------------------------------------------------------------------------------
+
+  - Felipe Nunez
+  - Cristian Arango
+  - Miguel Patino
+  - Sharon Zapata
+  - Jhoan Chavez
+
+
+--------------------------------------------------------------------------------
+2. IDEA DE DESARROLLO WEB ELEGIDA
+--------------------------------------------------------------------------------
+
+  Agenda de eventos culturales locales. Un portal donde los organizadores
+  publican conciertos, ferias y talleres, y el publico los descubre y marca
+  su interes.
+
+2.1 Que problema resuelve
+  La oferta cultural local suele estar dispersa en publicaciones sueltas,
+  afiches y grupos de mensajeria, lo que dificulta encontrarla y compararla.
+  AgentArt la reune en un solo lugar, con informacion ordenada y confiable, y
+  le da a los organizadores un canal propio para llegar a mas gente.
+
+2.2 Como funciona
+  - El publico explora el listado, filtra por fecha, categoria, ciudad y
+    precio, busca por texto, consulta el detalle con imagenes y ubicacion, y
+    guarda favoritos. Tambien puede compartir un evento en redes o agregarlo
+    a su calendario.
+  - Los organizadores se registran y crean, editan o eliminan sus eventos,
+    con uno o varios afiches.
+  - El administrador revisa cada evento antes de publicarlo y lo aprueba o
+    rechaza indicando el motivo.
+
+2.3 Analisis inicial (las 5 preguntas)
+
+  1. Usuarios y crecimiento
+     5.000 visitantes mensuales, duplicandose cada ~3 meses.
+
+  2. Read o write-heavy
+     Muy read-heavy: cerca de 99 % lecturas y 1 % escrituras. Solo los
+     organizadores publican.
+
+  3. Datos criticos
+     Nunca perder eventos publicados ni cuentas de organizadores. Se tolera
+     desfase en contadores (visitas, "me interesa") y recomendaciones.
+
+  4. Latencia
+     Listado y detalle < 200 ms. Publicar un evento con imagen: 2 a 3 s.
+
+  5. Costo
+     Paginas cacheadas en CDN, imagenes en almacenamiento de objetos y una
+     base de datos pequena. Casi todo el trafico no toca el servidor.
+
+2.4 Estimacion de costos
+
+  Fase                        Componentes                 USD/mes  COP/mes
+  --------------------------  --------------------------  -------  ---------
+  Lanzamiento (5.000          Hosting estatico con CDN    0        0
+  visitantes)                 gratis, base de datos y
+                              almacenamiento de imagenes
+                              en nivel gratuito
+  ~9 meses (40.000            Plan de pago de la base de  25       ~88.000
+  visitantes)                 datos; con CDN casi nada
+                              llega a ella
+
+  Aparte va el dominio (COP 45.000 a 105.000 al ano, estimado). Total
+  realista: entre COP 0 y 100.000 al mes. El costo principal es el tiempo de
+  moderacion.
+
+
+--------------------------------------------------------------------------------
+3. REQUERIMIENTOS FUNCIONALES
+--------------------------------------------------------------------------------
+
+3.1 Requisitos
+
+  ID      Requisito
+  ------  ------------------------------------------------------------------
+  RF-01   Listar y filtrar eventos por fecha, categoria, ciudad y precio.
+  RF-02   Ver el detalle del evento (descripcion, ubicacion, imagenes).
+  RF-03   Registrar organizadores e iniciar sesion.
+  RF-04   Crear, editar y eliminar los eventos propios.
+  RF-05   Subir imagenes o afiches del evento.
+  RF-06   Marcar "me interesa" y guardar favoritos.
+  RF-07   Buscar eventos por texto.
+  RF-08   Compartir en redes y agregar el evento al calendario.
+  RF-09   Moderacion: el administrador aprueba o rechaza eventos.
+  RF-10   Registro e inicio de sesion de usuarios del publico.
+  RF-11   Mostrar eventos similares en el detalle.
+  RF-12   Contar las visitas de cada evento.
+
+3.2 Epicas e historias de usuario
+
+  Las historias usan el formato "Como [usuario] quiero [accion] para
+  [beneficio]". Prioridad: Alta, Media o Baja. Estimacion en puntos de
+  historia (escala Fibonacci). El sprint indica en que iteracion se
+  desarrolla cada una.
+
+  Epica                                  Descripcion                      Pts
+  -------------------------------------  -------------------------------  ---
+  EP-01 Descubrimiento de eventos        El publico encuentra eventos con  21
+                                         listados, filtros, busqueda y
+                                         detalle.
+  EP-02 Cuentas y autenticacion          Registro, inicio de sesion y      17
+                                         recuperacion de acceso para cada
+                                         tipo de usuario.
+  EP-03 Gestion de eventos               Los organizadores publican y      24
+                                         administran sus eventos e
+                                         imagenes.
+  EP-04 Moderacion                       El administrador revisa y decide  10
+                                         sobre los eventos.
+  EP-05 Interaccion del publico          Favoritos, compartir y            10
+                                         calendario.
+
+
+  ----------------------------------------------------------------------------
+  EP-01 - DESCUBRIMIENTO DE EVENTOS
+  ----------------------------------------------------------------------------
+
+  HU-01 Listado de eventos            Prioridad: Alta   Pts: 3   Sprint: 3
+    Como visitante, quiero ver un listado de eventos proximos, para descubrir
+    que hay en mi ciudad.
+    Criterios de aceptacion:
+      - Solo se muestran eventos aprobados, no eliminados y con fecha
+        vigente.
+      - Cada tarjeta muestra titulo, fecha, ciudad, precio e imagen
+        principal.
+      - Carga en menos de 200 ms (desde cache/CDN).
+
+  HU-02 Filtros de eventos            Prioridad: Alta   Pts: 5   Sprint: 3
+    Como visitante, quiero filtrar por fecha, categoria, ciudad y precio,
+    para encontrar eventos que se ajusten a lo que busco.
+    Criterios de aceptacion:
+      - Los filtros se pueden combinar.
+      - Un evento gratuito tiene precio = 0 y se filtra como "gratis".
+      - Si no hay resultados, se muestra un mensaje claro.
+      - La URL conserva los filtros para poder compartirla.
+
+  HU-03 Detalle del evento            Prioridad: Alta   Pts: 5   Sprint: 3
+    Como visitante, quiero ver la descripcion, direccion, horario, precio e
+    imagenes de un evento, para decidir si asisto.
+    Criterios de aceptacion:
+      - Las imagenes se ordenan segun el campo "orden", con la principal
+        primero.
+      - Se muestra el organizador y la cantidad de interesados.
+      - La pagina es indexable por buscadores (HTML semantico).
+
+  HU-04 Busqueda por texto            Prioridad: Media  Pts: 5   Sprint: 3
+    Como visitante, quiero buscar eventos por palabras clave, para encontrar
+    uno especifico sin recorrer todo el listado.
+    Criterios de aceptacion:
+      - La busqueda cubre titulo y descripcion, con indice de texto
+        completo.
+      - Se puede combinar con los filtros.
+
+  HU-22 Eventos similares             Prioridad: Baja   Pts: 3   Sprint: 4
+    Como visitante, quiero ver eventos parecidos en el detalle, para
+    descubrir mas opciones.
+    Criterios de aceptacion:
+      - Se sugieren eventos vigentes y aprobados de la misma categoria y
+        ciudad.
+      - Maximo 4, con lista cacheada; puede estar levemente desactualizada.
+
+
+  ----------------------------------------------------------------------------
+  EP-02 - CUENTAS Y AUTENTICACION
+  ----------------------------------------------------------------------------
+
+  HU-10 Registro de organizadores     Prioridad: Alta   Pts: 3   Sprint: 1
+    Como organizador, quiero crear una cuenta con mis datos (nombre, correo,
+    telefono, descripcion), para poder publicar eventos.
+    Criterios de aceptacion:
+      - El correo es unico y la contrasena se guarda como hash.
+      - Hay proteccion contra spam (por ejemplo, captcha).
+
+  HU-11 Inicio y cierre de sesion     Prioridad: Alta   Pts: 3   Sprint: 1
+    Como organizador, quiero iniciar y cerrar sesion de forma segura, para
+    gestionar mis eventos.
+    Criterios de aceptacion:
+      - Solo veo y edito mis propios eventos.
+
+  HU-17 Acceso del administrador      Prioridad: Alta   Pts: 3   Sprint: 1
+    Como administrador, quiero acceder a un panel protegido, para moderar
+    contenido.
+    Criterios de aceptacion:
+      - Es una cuenta distinta a las de organizador y usuario.
+      - Las cuentas de administrador se crean manualmente.
+
+  HU-07 Registro del publico          Prioridad: Media  Pts: 5   Sprint: 4
+    Como persona del publico, quiero crear una cuenta con correo y
+    contrasena, para guardar mis eventos de interes.
+    Criterios de aceptacion:
+      - El correo es unico.
+      - La contrasena se guarda como hash.
+      - Si el correo ya existe, se muestra un error claro.
+
+  HU-24 Recuperacion de contrasena    Prioridad: Media  Pts: 3   Sprint: 4
+    Como usuario u organizador, quiero restablecer mi contrasena por correo,
+    para recuperar el acceso si la olvido.
+    Criterios de aceptacion:
+      - El enlace expira en 24 horas y es de un solo uso.
+      - La respuesta no revela si el correo existe.
+
+
+  ----------------------------------------------------------------------------
+  EP-03 - GESTION DE EVENTOS (ORGANIZADOR)
+  ----------------------------------------------------------------------------
+
+  HU-12 Crear evento                  Prioridad: Alta   Pts: 5   Sprint: 1
+    Como organizador, quiero publicar un evento con titulo, descripcion,
+    fechas, precio, direccion, categoria y ciudad, para que el publico lo
+    conozca.
+    Criterios de aceptacion:
+      - Se validan los campos obligatorios; fecha_fin no puede ser anterior
+        a fecha_inicio.
+      - El evento queda con estado_moderacion = "pendiente" (valores:
+        pendiente, aprobado, rechazado).
+      - Publicar con imagen toma entre 2 y 3 s.
+
+  HU-13 Subir imagenes                Prioridad: Alta   Pts: 8   Sprint: 1
+    Como organizador, quiero subir uno o varios afiches y definir cual es la
+    principal y su orden, para que el evento sea atractivo.
+    Criterios de aceptacion:
+      - Solo se aceptan formatos y tamanos permitidos.
+      - Solo una imagen puede ser la principal (indice unico parcial sobre
+        es_principal).
+
+  HU-14 Editar evento                 Prioridad: Alta   Pts: 3   Sprint: 2
+    Como organizador, quiero modificar los datos de un evento mio, para
+    corregir errores o actualizar informacion.
+    Criterios de aceptacion:
+      - Si cambio datos sensibles, el evento vuelve a moderacion.
+
+  HU-15 Eliminar evento               Prioridad: Media  Pts: 2   Sprint: 2
+    Como organizador, quiero eliminar un evento mio, para que deje de
+    mostrarse al publico.
+    Criterios de aceptacion:
+      - Se pide confirmacion.
+      - La eliminacion es logica (campo "eliminado"), no se pierde el
+        registro.
+
+  HU-16 Estado de mis eventos         Prioridad: Media  Pts: 3   Sprint: 2
+    Como organizador, quiero ver si mis eventos estan pendientes, aprobados
+    o rechazados, y el motivo del rechazo, para corregirlos y volver a
+    enviarlos.
+    Criterios de aceptacion:
+      - El motivo registrado en la moderacion es visible para el
+        organizador.
+
+  HU-23 Contador de visitas           Prioridad: Media  Pts: 3   Sprint: 3
+    Como organizador, quiero ver cuantas visitas tiene mi evento, para medir
+    su alcance.
+    Criterios de aceptacion:
+      - Se incrementa contador_visitas por lotes o en segundo plano, sin
+        frenar la pagina cacheada.
+      - Se tolera un desfase en el valor mostrado.
+
+
+  ----------------------------------------------------------------------------
+  EP-04 - MODERACION (ADMINISTRADOR)
+  ----------------------------------------------------------------------------
+
+  HU-18 Cola de moderacion            Prioridad: Alta   Pts: 3   Sprint: 2
+    Como administrador, quiero ver la cola de eventos por moderar, para
+    revisarlos en orden.
+    Criterios de aceptacion:
+      - Se ordenan por fecha_creacion (los mas antiguos primero).
+
+  HU-19 Aprobar evento                Prioridad: Alta   Pts: 3   Sprint: 2
+    Como administrador, quiero aprobar un evento, para que se publique en el
+    portal.
+    Criterios de aceptacion:
+      - Se crea un registro en Moderacion con decision, fecha y
+        administrador.
+      - El evento aparece en listados y detalle (con la cache actualizada).
+
+  HU-20 Rechazar evento               Prioridad: Alta   Pts: 2   Sprint: 2
+    Como administrador, quiero rechazar un evento indicando el motivo, para
+    que el organizador sepa que corregir.
+    Criterios de aceptacion:
+      - El motivo es obligatorio.
+      - El evento no se muestra al publico.
+
+  HU-21 Historial de moderacion       Prioridad: Baja   Pts: 2   Sprint: 2
+    Como administrador, quiero ver las decisiones tomadas sobre cada evento,
+    para tener trazabilidad.
+    Criterios de aceptacion:
+      - Se listan las decisiones por evento con fecha, administrador y
+        motivo.
+
+
+  ----------------------------------------------------------------------------
+  EP-05 - INTERACCION DEL PUBLICO
+  ----------------------------------------------------------------------------
+
+  HU-08 Marcar favorito               Prioridad: Media  Pts: 3   Sprint: 4
+    Como usuario registrado, quiero marcar un evento como favorito ("me
+    interesa"), para encontrarlo despues facilmente.
+    Criterios de aceptacion:
+      - No se puede marcar el mismo evento dos veces (clave compuesta
+        usuario + evento).
+      - Se registra la fecha en que se marco.
+      - El contador de interesados se actualiza con desfase tolerado
+        (consistencia eventual).
+
+  HU-09 Gestionar favoritos           Prioridad: Media  Pts: 2   Sprint: 4
+    Como usuario registrado, quiero ver mi lista de favoritos y quitar los
+    que ya no me interesan, para mantenerla ordenada.
+    Criterios de aceptacion:
+      - Se ordena por fecha del evento.
+      - Si un evento fue eliminado o rechazado, deja de aparecer.
+
+  HU-05 Compartir en redes            Prioridad: Baja   Pts: 2   Sprint: 4
+    Como visitante, quiero compartir un evento en redes sociales, para
+    invitar a otras personas.
+    Criterios de aceptacion:
+      - Cada evento tiene una URL unica con titulo e imagen para la vista
+        previa.
+
+  HU-06 Agregar al calendario         Prioridad: Media  Pts: 3   Sprint: 4
+    Como visitante, quiero agregar un evento a mi calendario, para no
+    olvidarlo.
+    Criterios de aceptacion:
+      - Se genera un archivo .ics o un enlace a Google Calendar con titulo,
+        fechas y direccion.
+
+
+3.3 Planificacion por sprints
+
+  Supuestos: sprints de 2 semanas y capacidad aproximada de 20 puntos por
+  sprint. Total: 82 puntos en 4 sprints. Son estimaciones iniciales que se
+  ajustan con el equipo.
+
+  Sprint 1 (22 pts) - Cuentas y publicacion de eventos
+    HU-10 (3), HU-11 (3), HU-17 (3), HU-12 (5), HU-13 (8)
+    Objetivo: un organizador puede registrarse, iniciar sesion y publicar un
+    evento con imagenes.
+
+  Sprint 2 (18 pts) - Moderacion y gestion
+    HU-18 (3), HU-19 (3), HU-20 (2), HU-14 (3), HU-15 (2), HU-16 (3),
+    HU-21 (2)
+    Objetivo: el administrador modera, y el organizador edita, elimina y
+    sigue el estado de sus eventos.
+
+  Sprint 3 (21 pts) - Descubrimiento publico
+    HU-01 (3), HU-02 (5), HU-03 (5), HU-04 (5), HU-23 (3)
+    Objetivo: el publico lista, filtra, busca y ve eventos con cache/CDN y
+    SEO. Primer lanzamiento utilizable.
+
+  Sprint 4 (21 pts) - Usuarios y extras
+    HU-07 (5), HU-08 (3), HU-09 (2), HU-05 (2), HU-06 (3), HU-22 (3),
+    HU-24 (3)
+    Objetivo: favoritos, compartir, calendario, eventos similares y
+    recuperacion de contrasena.
+
+  Dependencias clave:
+    - HU-12 y HU-13 requieren que las categorias y ciudades ya esten
+      cargadas (sin ellas no se puede crear un evento).
+    - Ningun evento es visible al publico hasta que existe la moderacion
+      (Sprint 2).
+    - El Sprint 3 es el hito minimo para publicar el portal.
+
+3.4 Trazabilidad: requisito funcional -> historias de usuario
+
+  Sirve para comprobar que cada requisito tiene historias que lo cubren y
+  que ninguna historia queda "huerfana".
+
+  RF-01   HU-01, HU-02
+  RF-02   HU-03
+  RF-03   HU-10, HU-11, HU-24
+  RF-04   HU-12, HU-14, HU-15
+  RF-05   HU-13
+  RF-06   HU-08, HU-09
+  RF-07   HU-04
+  RF-08   HU-05, HU-06
+  RF-09   HU-16, HU-17, HU-18, HU-19, HU-20, HU-21
+  RF-10   HU-07, HU-24
+  RF-11   HU-22
+  RF-12   HU-23
+
+3.5 Decisiones adoptadas y cambios
+
+  Supuestos tomados donde faltaba una decision. Se pueden cambiar; si
+  cambian, se ajustan las historias indicadas.
+
+   1. Cuentas del publico: se mantiene la entidad USUARIO. Nuevo RF-10
+      (registro e inicio de sesion de usuarios) y RNF-06 aplica tambien a
+      ellos. Si se elimina, cambian HU-07 a HU-09.
+   2. Recomendaciones: se definen como "eventos similares" (misma categoria
+      y ciudad) en el detalle. Nuevo RF-11 (HU-22). Se calcula por consulta
+      y se cachea; no requiere entidad nueva.
+   3. Contador de visitas: nuevo RF-12 (HU-23). Se agrega contador_visitas
+      (entero, por defecto 0) a EVENTO.
+   4. Estado de moderacion: estado_moderacion solo admite pendiente,
+      aprobado o rechazado.
+   5. Imagen principal: indice unico parcial en IMAGEN sobre es_principal
+      por evento.
+   6. Precio gratuito: se representa con precio = 0.
+   7. Ubicacion: solo direccion; el mapa se resuelve con un enlace a Maps,
+      sin latitud ni longitud.
+   8. Busqueda: indice de texto completo sobre titulo y descripcion.
+   9. Administradores: se crean manualmente, no hay registro publico de
+      administradores.
+  10. Recuperacion de contrasena: con un servicio de autenticacion gestionado
+      no necesita tablas nuevas; si es propia, requiere una tabla de tokens.
+
+
+--------------------------------------------------------------------------------
+4. REQUERIMIENTOS NO FUNCIONALES Y DEFINITION OF DONE
+--------------------------------------------------------------------------------
+
+4.1 Requisitos no funcionales
+
+  ID       Atributo          Requisito
+  -------  ----------------  ------------------------------------------------
+  RNF-01   Rendimiento       Listado y detalle < 200 ms; publicar con imagen
+                             en 2 a 3 s. Se logra con cache y CDN.
+  RNF-02   Escalabilidad     Absorber picos de trafico (por ejemplo, un
+                             festival) y duplicar el trafico cada ~3 meses
+                             sin reescribir el sistema.
+  RNF-03   Durabilidad       Respaldo de la base de datos y de las imagenes.
+                             Los eventos publicados y las cuentas no se
+                             pierden.
+  RNF-04   Consistencia      Consistencia eventual aceptable en contadores
+                             (visitas, "me interesa") y recomendaciones.
+  RNF-05   Disponibilidad    >= 99 %. Si cae el backend, las paginas
+                             cacheadas siguen visibles.
+  RNF-06   Seguridad         Autenticacion de organizadores, usuarios y
+                             administradores; validacion de archivos subidos
+                             y proteccion contra spam.
+  RNF-07   SEO y             Paginas indexables y HTML semantico, porque el
+           accesibilidad     descubrimiento viene de buscadores.
+  RNF-08   Costo             Casi cero en la fase inicial, con pago por uso.
+
+4.2 Definition of Done (DoD)
+
+  Una historia de usuario se considera terminada solo si cumple todos los
+  puntos siguientes.
+
+  Codigo y calidad
+    [ ] Cumple todos sus criterios de aceptacion.
+    [ ] El codigo fue revisado y aprobado mediante pull request por al menos
+        otro integrante.
+    [ ] Pasa el linter y las pruebas automatizadas, y no rompe funcionalidades
+        existentes.
+    [ ] Tiene pruebas para su logica principal y para los casos de error mas
+        importantes.
+
+  Rendimiento y seguridad
+    [ ] Listado y detalle responden en menos de 200 ms con cache (RNF-01).
+    [ ] Valida los datos de entrada y los archivos subidos; no expone
+        contrasenas ni datos de otras cuentas (RNF-06).
+    [ ] Respeta los permisos por rol (publico, organizador, administrador).
+
+  Experiencia de usuario
+    [ ] Se ve y funciona bien en celular y en escritorio.
+    [ ] Usa HTML semantico y cumple lo basico de accesibilidad: textos
+        alternativos, contraste y navegacion con teclado (RNF-07).
+    [ ] Muestra mensajes claros ante errores y estados vacios.
+
+  Entrega
+    [ ] Esta integrada en la rama principal y desplegada en el entorno de
+        pruebas.
+    [ ] La base de datos cambia solo mediante migraciones versionadas.
+    [ ] La documentacion (README, modelo de datos, variables de entorno) esta
+        actualizada.
+    [ ] Fue demostrada al equipo y aceptada como completa.
+
+
+--------------------------------------------------------------------------------
+5. MODELADO DE LA BASE DE DATOS
+--------------------------------------------------------------------------------
+
+  Los nombres de campos van sin tildes ni enies, como se crearan en la base
+  de datos. El diagrama grafico esta en docs/modelo_ER_AgentArt.png y en el
+  README.md (se muestra automaticamente en GitHub).
+
+5.1 Entidades
+
+  ORGANIZADOR     id_organizador (PK), nombre, correo (unico),
+                  contrasena_hash, telefono, descripcion, fecha_registro.
+  EVENTO          id_evento (PK), titulo, descripcion, fecha_inicio,
+                  fecha_fin, precio, direccion, estado_moderacion
+                  (pendiente, aprobado o rechazado), contador_interesados,
+                  contador_visitas, fecha_creacion, eliminado,
+                  id_organizador (FK), id_categoria (FK), id_ciudad (FK).
+  CATEGORIA       id_categoria (PK), nombre.
+  CIUDAD          id_ciudad (PK), nombre, departamento.
+  IMAGEN          id_imagen (PK), url, orden, es_principal, id_evento (FK).
+  MODERACION      id_moderacion (PK), decision, motivo, fecha,
+                  id_evento (FK), id_admin (FK).
+  ADMINISTRADOR   id_admin (PK), nombre, correo, contrasena_hash.
+  USUARIO         id_usuario (PK), nombre, correo (unico), contrasena_hash,
+                  fecha_registro.
+  FAVORITO        id_usuario (PK, FK), id_evento (PK, FK), fecha_marcado.
+
+5.2 Relaciones (1 a muchos)
+
+  ORGANIZADOR   1 --- N  EVENTO       publica
+  CATEGORIA     1 --- N  EVENTO       clasifica
+  CIUDAD        1 --- N  EVENTO       ubica
+  EVENTO        1 --- N  IMAGEN       tiene
+  EVENTO        1 --- N  MODERACION   es revisado en
+  ADMINISTRADOR 1 --- N  MODERACION   realiza
+  USUARIO       1 --- N  FAVORITO     marca
+  EVENTO        1 --- N  FAVORITO     es marcado en
+
+5.3 Reglas del modelo
+
+  - Un organizador publica muchos eventos; cada evento pertenece a una
+    categoria y a una ciudad.
+  - Un evento tiene varias imagenes, y solo una puede ser la principal.
+  - Cada decision de moderacion relaciona un evento con el administrador que
+    la tomo. Un evento puede tener varias decisiones (por ejemplo, un
+    rechazo y luego una aprobacion).
+  - Favorito es la tabla intermedia entre usuarios y eventos; su clave
+    primaria compuesta evita marcar dos veces el mismo evento.
+  - La eliminacion de eventos es logica (campo "eliminado"), para no perder
+    informacion.
+  - contador_interesados y contador_visitas admiten consistencia eventual.
+
+
+================================================================================
+FIN DEL DOCUMENTO
+================================================================================
