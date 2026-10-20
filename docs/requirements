@@ -87,6 +87,15 @@ CONTENIDO
   moderacion.
 
 
+2.5 Tecnologias sugeridas (no claras todavia)
+
+  Capa            Tecnologia
+  --------------  ------------------------------------------------
+  Frontend        React
+  Backend         Node.js (probablemente)
+  Base de datos   PostgreSQL o MySQL
+  Despliegue      Docker y GitHub Actions
+
 --------------------------------------------------------------------------------
 3. REQUERIMIENTOS FUNCIONALES
 --------------------------------------------------------------------------------
@@ -503,12 +512,12 @@ CONTENIDO
                   (pendiente, aprobado o rechazado), contador_interesados,
                   contador_visitas, fecha_creacion, eliminado,
                   id_organizador (FK), id_categoria (FK), id_ciudad (FK).
-  CATEGORIA       id_categoria (PK), nombre.
+  CATEGORIA       id_categoria (PK), nombre (unico).
   CIUDAD          id_ciudad (PK), nombre, departamento.
   IMAGEN          id_imagen (PK), url, orden, es_principal, id_evento (FK).
   MODERACION      id_moderacion (PK), decision, motivo, fecha,
                   id_evento (FK), id_admin (FK).
-  ADMINISTRADOR   id_admin (PK), nombre, correo, contrasena_hash.
+  ADMINISTRADOR   id_admin (PK), nombre, correo (unico), contrasena_hash.
   USUARIO         id_usuario (PK), nombre, correo (unico), contrasena_hash,
                   fecha_registro.
   FAVORITO        id_usuario (PK, FK), id_evento (PK, FK), fecha_marcado.
@@ -529,6 +538,8 @@ CONTENIDO
   - Un organizador publica muchos eventos; cada evento pertenece a una
     categoria y a una ciudad.
   - Un evento tiene varias imagenes, y solo una puede ser la principal.
+  - El correo es unico en organizadores, usuarios y administradores; el
+    nombre de la categoria tambien es unico.
   - Cada decision de moderacion relaciona un evento con el administrador que
     la tomo. Un evento puede tener varias decisiones (por ejemplo, un
     rechazo y luego una aprobacion).
